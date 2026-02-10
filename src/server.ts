@@ -495,6 +495,35 @@ const DASHBOARD_HTML = `<!doctype html>
         min-height: 520px;
       }
 
+      .detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .detail-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .detail-actions button {
+        background: #efe7dd;
+        color: #5d544a;
+        border: 1px solid #e3d8cc;
+        box-shadow: none;
+      }
+
+      .detail-actions button:hover {
+        box-shadow: 0 8px 16px rgba(29, 27, 22, 0.12);
+      }
+
+      .detail-actions button:active {
+        transform: translateY(1px);
+      }
+
       pre {
         background: #101010;
         color: #f6f2eb;
@@ -557,6 +586,10 @@ const DASHBOARD_HTML = `<!doctype html>
         .details {
           min-height: 420px;
         }
+
+        .detail-actions button {
+          flex: 1 1 120px;
+        }
       }
     </style>
   </head>
@@ -585,7 +618,13 @@ const DASHBOARD_HTML = `<!doctype html>
         </section>
 
         <section class="card details">
-          <h2>Details</h2>
+          <div class="detail-header">
+            <h2>Details</h2>
+            <div class="detail-actions">
+              <button type="button" id="copy-details">Copy</button>
+              <button type="button" id="export-details">Export</button>
+            </div>
+          </div>
           <div id="detail-meta" class="status">Select a run.</div>
           <pre id="detail-body"></pre>
         </section>
@@ -598,6 +637,8 @@ const DASHBOARD_HTML = `<!doctype html>
       const queryEl = document.getElementById('query');
       const metaEl = document.getElementById('detail-meta');
       const bodyEl = document.getElementById('detail-body');
+      const copyBtn = document.getElementById('copy-details');
+      const exportBtn = document.getElementById('export-details');
       let selectedRunId = null;
       let lastRunsPayload = '';
 
@@ -688,6 +729,40 @@ const DASHBOARD_HTML = `<!doctype html>
         bodyEl.textContent = parts.join('\\n');
       }
 
+      async function copyDetails() {
+        const text = bodyEl.textContent || '';
+        if (!text.trim()) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          statusEl.textContent = 'Details copied to clipboard.';
+        } catch {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          textarea.remove();
+          statusEl.textContent = 'Details copied to clipboard.';
+        }
+      }
+
+      function exportDetails() {
+        const text = bodyEl.textContent || '';
+        if (!text.trim()) return;
+        const filename = selectedRunId ? \`dexter-\${selectedRunId}.txt\` : 'dexter-details.txt';
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
       document.getElementById('run-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const query = queryEl.value.trim();
@@ -712,6 +787,9 @@ const DASHBOARD_HTML = `<!doctype html>
           await loadRun(data.runId);
         }
       });
+
+      copyBtn?.addEventListener('click', copyDetails);
+      exportBtn?.addEventListener('click', exportDetails);
 
       fetchRuns();
       setInterval(fetchRuns, 5000);
