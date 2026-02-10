@@ -343,8 +343,12 @@ const DASHBOARD_HTML = `<!doctype html>
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+        grid-template-areas:
+          "form details"
+          "history details";
         gap: 20px;
+        align-items: start;
       }
 
       .card {
@@ -408,9 +412,11 @@ const DASHBOARD_HTML = `<!doctype html>
       .runs {
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        max-height: 420px;
+        gap: 12px;
+        max-height: 440px;
         overflow-y: auto;
+        padding: 4px;
+        scrollbar-gutter: stable both-edges;
       }
 
       .run {
@@ -421,13 +427,18 @@ const DASHBOARD_HTML = `<!doctype html>
         gap: 6px;
         cursor: pointer;
         background: #fffaf5;
-        transition: border 0.2s ease, transform 0.2s ease;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
         animation: fadeInUp 0.4s ease;
       }
 
       .run:hover {
         border-color: var(--accent);
-        transform: translateY(-2px);
+        box-shadow: 0 10px 18px rgba(29, 27, 22, 0.12);
+      }
+
+      .run.selected {
+        border-color: var(--accent);
+        box-shadow: 0 12px 20px rgba(29, 27, 22, 0.16);
       }
 
       .run-title {
@@ -465,9 +476,23 @@ const DASHBOARD_HTML = `<!doctype html>
         color: #b23c2d;
       }
 
+      .card.form {
+        grid-area: form;
+      }
+
+      .card.history {
+        grid-area: history;
+      }
+
+      .card.details {
+        grid-area: details;
+      }
+
       .details {
-        display: grid;
+        display: flex;
+        flex-direction: column;
         gap: 12px;
+        min-height: 520px;
       }
 
       pre {
@@ -475,14 +500,63 @@ const DASHBOARD_HTML = `<!doctype html>
         color: #f6f2eb;
         border-radius: 16px;
         padding: 16px;
-        min-height: 220px;
         white-space: pre-wrap;
         word-wrap: break-word;
+      }
+
+      .details pre {
+        flex: 1;
+        min-height: 240px;
+        max-height: 520px;
+        overflow: auto;
       }
 
       @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 28px 18px 56px;
+        }
+
+        header {
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "form"
+            "history"
+            "details";
+        }
+
+        .card {
+          padding: 16px;
+        }
+
+        textarea {
+          min-height: 140px;
+        }
+
+        button {
+          width: 100%;
+        }
+
+        .runs {
+          max-height: 320px;
+        }
+
+        pre {
+          min-height: 180px;
+        }
+
+        .details {
+          min-height: 420px;
+        }
       }
     </style>
   </head>
@@ -491,28 +565,28 @@ const DASHBOARD_HTML = `<!doctype html>
       <header>
         <div class="title">Dexter Dashboard</div>
         <div class="subtitle">
-          Lance des runs, consulte les sorties, et pilote Dexter sans passer par le terminal.
+          Launch runs, review outputs, and control Dexter without the terminal.
         </div>
       </header>
 
       <div class="grid">
-        <section class="card">
-          <h2>Nouveau run</h2>
+        <section class="card form">
+          <h2>New run</h2>
           <form id="run-form">
-            <textarea id="query" placeholder="Votre requête Dexter..."></textarea>
-            <button type="submit">Lancer</button>
-            <div class="status" id="status">Prêt.</div>
+            <textarea id="query" placeholder="Your Dexter query..."></textarea>
+            <button type="submit">Start</button>
+            <div class="status" id="status">Ready.</div>
           </form>
         </section>
 
-        <section class="card">
-          <h2>Historique</h2>
+        <section class="card history">
+          <h2>History</h2>
           <div class="runs" id="runs"></div>
         </section>
 
         <section class="card details">
-          <h2>Détails</h2>
-          <div id="detail-meta" class="status">Sélectionnez un run.</div>
+          <h2>Details</h2>
+          <div id="detail-meta" class="status">Select a run.</div>
           <pre id="detail-body"></pre>
         </section>
       </div>
@@ -525,15 +599,26 @@ const DASHBOARD_HTML = `<!doctype html>
       const metaEl = document.getElementById('detail-meta');
       const bodyEl = document.getElementById('detail-body');
       let selectedRunId = null;
+      let lastRunsPayload = '';
 
       async function fetchRuns() {
         const res = await fetch('/api/runs', { credentials: 'include' });
         if (!res.ok) {
-          statusEl.textContent = 'Erreur lors du chargement des runs.';
+          statusEl.textContent = 'Failed to load runs.';
           return;
         }
         const runs = await res.json();
+        const payload = JSON.stringify(runs);
+        if (payload === lastRunsPayload) {
+          if (selectedRunId) {
+            loadRun(selectedRunId);
+          }
+          return;
+        }
+        lastRunsPayload = payload;
+        const scrollTop = runsEl.scrollTop;
         renderRuns(runs);
+        runsEl.scrollTop = scrollTop;
         if (selectedRunId) {
           loadRun(selectedRunId);
         }
@@ -545,7 +630,7 @@ const DASHBOARD_HTML = `<!doctype html>
           const card = document.createElement('div');
           card.className = 'run';
           card.dataset.runId = run.runId;
-          const query = run.query || '(Requête inconnue)';
+          const query = run.query || '(Unknown query)';
           const time = run.startedAt || run.runId;
           const status = run.status || 'unknown';
           const titleEl = document.createElement('div');
@@ -563,8 +648,13 @@ const DASHBOARD_HTML = `<!doctype html>
           card.appendChild(titleEl);
           card.appendChild(metaEl);
           card.appendChild(badgeEl);
+          if (selectedRunId === run.runId) {
+            card.classList.add('selected');
+          }
           card.addEventListener('click', () => {
             selectedRunId = run.runId;
+            runsEl.querySelectorAll('.run.selected').forEach((el) => el.classList.remove('selected'));
+            card.classList.add('selected');
             loadRun(run.runId);
           });
           runsEl.appendChild(card);
@@ -574,7 +664,7 @@ const DASHBOARD_HTML = `<!doctype html>
       async function loadRun(runId) {
         const res = await fetch(\`/api/runs/\${encodeURIComponent(runId)}\`, { credentials: 'include' });
         if (!res.ok) {
-          metaEl.textContent = 'Impossible de charger ce run.';
+          metaEl.textContent = 'Unable to load this run.';
           bodyEl.textContent = '';
           return;
         }
@@ -602,7 +692,7 @@ const DASHBOARD_HTML = `<!doctype html>
         event.preventDefault();
         const query = queryEl.value.trim();
         if (!query) return;
-        statusEl.textContent = 'Lancement en cours...';
+        statusEl.textContent = 'Launching run...';
         const res = await fetch('/api/run', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -610,11 +700,11 @@ const DASHBOARD_HTML = `<!doctype html>
           body: JSON.stringify({ query }),
         });
         if (!res.ok) {
-          statusEl.textContent = 'Erreur lors du lancement.';
+          statusEl.textContent = 'Launch failed.';
           return;
         }
         const data = await res.json();
-        statusEl.textContent = \`Run lancé: \${data.runId}\`;
+        statusEl.textContent = \`Run started: \${data.runId}\`;
         queryEl.value = '';
         await fetchRuns();
         if (data.runId) {
