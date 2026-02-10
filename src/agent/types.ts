@@ -10,6 +10,8 @@ export interface AgentConfig {
   maxIterations?: number;
   /** AbortSignal for cancelling agent execution */
   signal?: AbortSignal;
+  /** Optional run ID used for scratchpad filenames (e.g., web dashboard runs) */
+  runId?: string;
 }
 
 /**

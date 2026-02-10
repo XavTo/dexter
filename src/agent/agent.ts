@@ -26,6 +26,7 @@ export class Agent {
   private readonly toolMap: Map<string, StructuredToolInterface>;
   private readonly systemPrompt: string;
   private readonly signal?: AbortSignal;
+  private readonly runId?: string;
 
   private constructor(
     config: AgentConfig,
@@ -39,6 +40,7 @@ export class Agent {
     this.toolMap = new Map(tools.map(t => [t.name, t]));
     this.systemPrompt = systemPrompt;
     this.signal = config.signal;
+    this.runId = config.runId;
   }
 
   /**
@@ -66,7 +68,7 @@ export class Agent {
     }
 
     // Create scratchpad for this query - single source of truth for all work done
-    const scratchpad = new Scratchpad(query);
+    const scratchpad = new Scratchpad(query, undefined, this.runId);
     
     // Build initial prompt with conversation history context
     let currentPrompt = this.buildInitialPrompt(query, inMemoryHistory);

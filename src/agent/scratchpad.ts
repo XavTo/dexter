@@ -84,20 +84,25 @@ export class Scratchpad {
   // Stores indices of tool_result entries that have been cleared from context
   private clearedToolIndices: Set<number> = new Set();
 
-  constructor(query: string, limitConfig?: Partial<ToolLimitConfig>) {
+  constructor(query: string, limitConfig?: Partial<ToolLimitConfig>, runId?: string) {
     this.limitConfig = { ...DEFAULT_LIMIT_CONFIG, ...limitConfig };
 
     if (!existsSync(this.scratchpadDir)) {
       mkdirSync(this.scratchpadDir, { recursive: true });
     }
 
-    const hash = createHash('md5').update(query).digest('hex').slice(0, 12);
-    const now = new Date();
-    const timestamp = now.toISOString()
-      .slice(0, 19)           // "2026-01-21T15:30:45"
-      .replace('T', '-')      // "2026-01-21-15:30:45"
-      .replace(/:/g, '');     // "2026-01-21-153045"
-    this.filepath = join(this.scratchpadDir, `${timestamp}_${hash}.jsonl`);
+    if (runId && runId.trim()) {
+      const normalized = runId.endsWith('.jsonl') ? runId : `${runId}.jsonl`;
+      this.filepath = join(this.scratchpadDir, normalized);
+    } else {
+      const hash = createHash('md5').update(query).digest('hex').slice(0, 12);
+      const now = new Date();
+      const timestamp = now.toISOString()
+        .slice(0, 19)           // "2026-01-21T15:30:45"
+        .replace('T', '-')      // "2026-01-21-15:30:45"
+        .replace(/:/g, '');     // "2026-01-21-153045"
+      this.filepath = join(this.scratchpadDir, `${timestamp}_${hash}.jsonl`);
+    }
 
     // Write initial entry with the query
     this.append({ type: 'init', content: query, timestamp: new Date().toISOString() });
